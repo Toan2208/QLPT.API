@@ -4,15 +4,6 @@ using QLPT.API.Models;
 
 namespace QLPT.API.Controllers
 {
-    public class YeuCauSuaChuaDto
-    {
-        public int MaPhong { get; set; }
-        public int MaKhach { get; set; }
-        public string? NoiDung { get; set; }
-        public string? TrangThai { get; set; }
-        public DateTime? NgayBao { get; set; }
-    }
-
     [Route("api/[controller]")]
     [ApiController]
     public class YeuCauSuaChuaController : ControllerBase
@@ -24,17 +15,16 @@ namespace QLPT.API.Controllers
             _context = context;
         }
 
-        // 1. API lấy danh sách yêu cầu sửa chữa theo mã khách
-        [HttpGet("customer/{maKhach}")]
-        public async Task<IActionResult> GetByCustomer(int maKhach)
+        // Lấy danh sách yêu cầu sửa chữa (Chủ trọ xem tất cả hoặc khách xem của mình)
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
         {
             try
             {
                 var list = await _context.YeuCauSuaChuas
-                    .Where(x => x.MaKhach == maKhach)
-                    .OrderByDescending(x => x.MaYeuCau)
+                    .Include(y => y.MaPhongNavigation)
+                    .Include(y => y.MaKhachNavigation)
                     .ToListAsync();
-
                 return Ok(list);
             }
             catch (Exception ex)
@@ -43,31 +33,46 @@ namespace QLPT.API.Controllers
             }
         }
 
-        // 2. API nhận yêu cầu sửa chữa từ Flutter qua DTO
+        // Khách gửi yêu cầu sửa chữa mới từ App Mobile
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] YeuCauSuaChuaDto dto)
+        public async Task<IActionResult> Create([FromBody] YeuCauSuaChua model)
         {
             try
             {
-                if (dto == null) return BadRequest("Dữ liệu không hợp lệ.");
+                if (model == null) return BadRequest(new { success = false, message = "Dữ liệu không hợp lệ" });
+                model.NgayBao = DateTime.Now;
+                model.TrangThai = "Chờ tiếp nhận";
+                model.KhachXacNhan = false;
 
-                var entity = new YeuCauSuaChua
-                {
-                    MaPhong = dto.MaPhong,
-                    MaKhach = dto.MaKhach,
-                    NoiDung = dto.NoiDung,
-                    TrangThai = "Chờ tiếp nhận",
-                    NgayBao = DateTime.Now
-                };
-
-                _context.YeuCauSuaChuas.Add(entity);
+                _context.YeuCauSuaChuas.Add(model);
                 await _context.SaveChangesAsync();
-
-                return Ok(new { success = true, message = "Gửi yêu cầu thành công" });
+                return Ok(new { success = true, message = "Gửi yêu cầu sửa chữa thành công", data = model });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = $"Lỗi server: {ex.Message}" });
+                return StatusCode(500, new { success = false, message = $"Lỗi server: {ex.Message}" });
+            }
+        }
+
+        // Khách xác nhận đã hoàn thành sửa chữa
+        [HttpPost("{id}/xac-nhan")]
+        public async Task<IActionResult> ConfirmRepair(int id)
+        {
+            try
+            {
+                var yc = await _context.YeuCauSuaChuas.FindAsync(id);
+                if (yc == null) return NotFound(new { success = false, message = "Không tìm thấy yêu cầu" });
+
+                yc.KhachXacNhan = true;
+                yc.TrangThai = "Đã hoàn thành";
+                yc.NgayHoanThanh = DateTime.Now;
+
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = "Xác nhận thành công" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Lỗi server: {ex.Message}" });
             }
         }
     }

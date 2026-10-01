@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using QLPT.API.Models;
+
 namespace QLPT.API.Models;
 
 public partial class BanGiaoTaiSan

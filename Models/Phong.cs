@@ -29,7 +29,7 @@ public partial class Phong
 
     public virtual ICollection<DatPhong> DatPhongs { get; set; } = new List<DatPhong>();
 
-    public virtual ICollection<HopDong> HopDongs { get; set; } = new List<HopDong>();
+    public virtual HopDong? HopDong { get; set; }
 
     public virtual CoSo? MaCoSoNavigation { get; set; }
 
